@@ -1,282 +1,237 @@
-import customtkinter
-import os
-import sys
 import threading
-import subprocess
-import requests
-
-# PRE-IMPORT UPDATE CHECK: If a newer yt-dlp wheel exists in AppData, use it.
-try:
-    app_data_dir = os.path.join(os.getenv('LOCALAPPDATA'), 'UniversalDownloader', 'updates')
-    if os.path.exists(app_data_dir):
-        # Add to front of sys.path so it takes precedence
-        sys.path.insert(0, app_data_dir)
-        # Scan for .whl files in that directory
-        for file in os.listdir(app_data_dir):
-            if file.endswith('.whl'):
-                 sys.path.insert(0, os.path.join(app_data_dir, file))
-                 break
-except:
-    pass
+import os
 
 import yt_dlp
 
-import imageio_ffmpeg
-import config as cfg
-from tkinter import messagebox
+from kivy.app import App
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.label import Label
+from kivy.uix.textinput import TextInput
+from kivy.uix.button import Button
+from kivy.uix.progressbar import ProgressBar
+from kivy.clock import Clock
+from kivy.utils import platform
+from kivy.core.window import Window
+from kivy.uix.image import Image
+from kivy.animation import Animation
 
-# Set theme and color
-customtkinter.set_appearance_mode("Dark")
-customtkinter.set_default_color_theme("blue")
+# ── Fondo ─────────────────────────────────────────────
+Window.clearcolor = (0.10, 0.10, 0.13, 1)
 
-def resource_path(relative_path):
-    """ Get absolute path to resource, works for dev and for PyInstaller """
+# ── Directorio descarga ──────────────────────────────
+if platform == "android":
+    from android.permissions import request_permissions, Permission
+    from android.storage import primary_external_storage_path, app_storage_path
+
+    request_permissions([
+        Permission.INTERNET,
+        Permission.WRITE_EXTERNAL_STORAGE,
+        Permission.READ_EXTERNAL_STORAGE
+    ])
+
     try:
-        # PyInstaller creates a temp folder and stores path in _MEIPASS
-        base_path = sys._MEIPASS
-    except Exception:
-        base_path = os.path.abspath(".")
+        BASE_DIR = os.path.join(primary_external_storage_path(), "Download", "DescargaTube")
+    except:
+        BASE_DIR = os.path.join(app_storage_path(), "DescargaTube")
+else:
+    BASE_DIR = os.path.join(os.path.expanduser("~"), "Downloads", "DescargaTube")
 
-    return os.path.join(base_path, relative_path)
+os.makedirs(BASE_DIR, exist_ok=True)
 
-
-class App(customtkinter.CTk):
-    def __init__(self):
-        super().__init__()
-        
-        # Window configuration
-        self.title("Universal Video Downloader (YouTube, TikTok, FB, etc.)")
-        self.geometry("800x600")
-
-        # Grid layout
-        self.grid_columnconfigure(1, weight=1)
-        self.grid_rowconfigure(0, weight=1)
+# ── Logger ───────────────────────────────────────────
+class YDL_Logger:
+    def debug(self, msg): pass
+    def info(self, msg): pass
+    def warning(self, msg): pass
+    def error(self, msg): print(msg)
 
 
-        # Sidebar
-        self.sidebar_frame = customtkinter.CTkFrame(self, width=140, corner_radius=0)
-        self.sidebar_frame.grid(row=0, column=0, rowspan=4, sticky="nsew")
-        self.sidebar_frame.grid_rowconfigure(4, weight=1)
+class DownloaderUI(BoxLayout):
+    def __init__(self, **kwargs):
+        super().__init__(orientation="vertical", padding=20, spacing=15, **kwargs)
 
-        self.logo_label = customtkinter.CTkLabel(self.sidebar_frame, text="Universal\nDownloader", font=customtkinter.CTkFont(size=20, weight="bold"))
-        self.logo_label.grid(row=0, column=0, padx=20, pady=(20, 10))
+        self._downloading = False
+        self.format = None
 
-        self.signature_label = customtkinter.CTkLabel(self.sidebar_frame, text="By Morris", text_color="red", font=customtkinter.CTkFont(size=12, weight="bold"))
-        self.signature_label.grid(row=1, column=0, padx=20, pady=(0, 20))
+        # ── Título ─────────────────────────────
+        self.title = Label(
+            text="Descarga Tube PRO",
+            font_size=28,
+            bold=True,
+            size_hint=(1, .12)
+        )
+        self.add_widget(self.title)
 
-        self.sidebar_button_1 = customtkinter.CTkButton(self.sidebar_frame, text="Download Video", command=self.show_single_download)
-        self.sidebar_button_1.grid(row=2, column=0, padx=20, pady=10)
+        # ── Input ──────────────────────────────
+        self.url_input = TextInput(
+            hint_text="Pega enlace de YouTube, Facebook, TikTok o Instagram",
+            multiline=False,
+            size_hint=(1, .12),
+            background_color=(0.2,0.2,0.25,1),
+            foreground_color=(1,1,1,1)
+        )
+        self.add_widget(self.url_input)
 
-        # Main Area
-        self.main_frame = customtkinter.CTkFrame(self, corner_radius=0, fg_color="transparent")
-        self.main_frame.grid(row=0, column=1, sticky="nsew", padx=20, pady=20)
+        # ── Botones PEGAR / LIMPIAR ───────────
+        top_buttons = BoxLayout(size_hint=(1,.10), spacing=10)
 
-        # --- Single Download View ---
-        self.single_view = customtkinter.CTkFrame(self.main_frame, fg_color="transparent")
-        
-        self.url_label = customtkinter.CTkLabel(self.single_view, text="Video URL (YouTube, TikTok, Facebook, etc.):", font=customtkinter.CTkFont(size=14))
-        self.url_label.pack(anchor="w", pady=(0, 5))
-        
-        self.url_entry = customtkinter.CTkEntry(self.single_view, width=500, placeholder_text="Paste link here...")
-        self.url_entry.pack(anchor="w", pady=(0, 20))
+        self.btn_paste = Button(text="PEGAR")
+        self.btn_paste.bind(on_press=self.paste_link)
 
-        self.type_var = customtkinter.StringVar(value="video")
-        self.radio_video = customtkinter.CTkRadioButton(self.single_view, text="Best Video + Audio", variable=self.type_var, value="video")
-        self.radio_video.pack(anchor="w", pady=5)
-        self.radio_audio = customtkinter.CTkRadioButton(self.single_view, text="Audio Only (MP3)", variable=self.type_var, value="audio")
-        self.radio_audio.pack(anchor="w", pady=5)
+        self.btn_clear = Button(text="LIMPIAR")
+        self.btn_clear.bind(on_press=self.clear_link)
 
-        self.download_btn = customtkinter.CTkButton(self.single_view, text="Start Download", command=self.start_download_thread, height=40)
-        self.download_btn.pack(anchor="w", pady=20)
+        top_buttons.add_widget(self.btn_paste)
+        top_buttons.add_widget(self.btn_clear)
+        self.add_widget(top_buttons)
 
-        self.status_label = customtkinter.CTkLabel(self.single_view, text="Ready", text_color="gray")
-        self.status_label.pack(anchor="w", pady=10)
+        # ── Iconos ────────────────────────────
+        icons_layout = BoxLayout(size_hint=(1,.15), spacing=15)
 
-        self.progress_bar = customtkinter.CTkProgressBar(self.single_view, width=500)
-        self.progress_bar.set(0)
-        self.progress_bar.pack(anchor="w", pady=10)
-        
-        self.open_folder_btn = customtkinter.CTkButton(self.single_view, text="Open Download Folder", command=self.open_download_folder, state="disabled", fg_color="gray")
-        self.open_folder_btn.pack(anchor="w", pady=5)
+        icons_layout.add_widget(Image(source="youtube.png"))
+        icons_layout.add_widget(Image(source="facebook.png"))
+        icons_layout.add_widget(Image(source="tiktok.png"))
+        icons_layout.add_widget(Image(source="instagram.png"))
 
-        # Default View
-        self.show_single_download()
-        
-        # Start auto-update check after UI is ready
-        self.after(500, self.start_update_thread)
+        self.add_widget(icons_layout)
 
-    def start_update_thread(self):
-        # Start update in background
-        threading.Thread(target=self.perform_update, daemon=True).start()
+        # ── Formato ───────────────────────────
+        fmt_layout = BoxLayout(size_hint=(1,.12), spacing=10)
 
-    def perform_update(self):
-        self.after(0, lambda: self.update_status("Checking for core updates...", "orange"))
-        
-        try:
-            # Check if frozen (EXE mode)
-            if getattr(sys, 'frozen', False):
-                # EXE Update Logic: Download wheel to AppData
-                try:
-                    # 1. Get latest version info from PyPI
-                    response = requests.get("https://pypi.org/pypi/yt-dlp/json", timeout=5)
-                    data = response.json()
-                    latest_version = data['info']['version']
-                    
-                    current_version = yt_dlp.version.__version__
-                    
-                    if latest_version != current_version:
-                        self.after(0, lambda: self.update_status(f"Updating core to {latest_version}...", "orange"))
-                        
-                        # Find the wheel url
-                        wheel_url = None
-                        for url_info in data['urls']:
-                            if url_info['packagetype'] == 'bdist_wheel':
-                                wheel_url = url_info['url']
-                                break
-                        
-                        if wheel_url:
-                            # Define update path
-                            app_data_dir = os.path.join(os.getenv('LOCALAPPDATA'), 'UniversalDownloader', 'updates')
-                            if not os.path.exists(app_data_dir):
-                                os.makedirs(app_data_dir)
-                            
-                            # Clean old updates
-                            for f in os.listdir(app_data_dir):
-                                os.remove(os.path.join(app_data_dir, f))
-                                
-                            # Download new wheel
-                            filename = wheel_url.split('/')[-1]
-                            local_path = os.path.join(app_data_dir, filename)
-                            
-                            with requests.get(wheel_url, stream=True) as r:
-                                r.raise_for_status()
-                                with open(local_path, 'wb') as f:
-                                    for chunk in r.iter_content(chunk_size=8192): 
-                                        f.write(chunk)
-                                        
-                            self.after(0, lambda: self.update_status("Core updated! Restart required.", "green"))
-                        else:
-                             self.after(0, lambda: self.update_status("Update found but no wheel available.", "gray"))
-                    else:
-                        self.after(0, lambda: self.update_status("Core components are up to date.", "green"))
+        self.btn_mp4 = Button(text="MP4 Video")
+        self.btn_mp4.bind(on_press=self.select_mp4)
 
-                except Exception as e:
-                    print(f"EXE Update failed: {e}")
-                    self.after(0, lambda: self.update_status("Update check failed (net)", "gray"))
+        self.btn_mp3 = Button(text="Audio")
+        self.btn_mp3.bind(on_press=self.select_mp3)
 
-            else:
-                # Dev/Script Mode: Use Pip
-                # Add --no-warn-script-location to avoid path warnings cluttering or confusing
-                subprocess.check_call([sys.executable, "-m", "pip", "install", "-U", "yt-dlp"], 
-                                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                print("yt-dlp updated successfully.")
-                self.after(0, lambda: self.update_status("Core components updated. Ready.", "green"))
+        fmt_layout.add_widget(self.btn_mp4)
+        fmt_layout.add_widget(self.btn_mp3)
+        self.add_widget(fmt_layout)
 
-        except Exception as e:
-            print(f"Could not update yt-dlp: {e}")
-            self.after(0, lambda: self.update_status("Update check failed (continuing anyway)", "gray"))
-        
-        # Reset to Ready after a few seconds
-        self.after(3000, lambda: self.update_status_if_idle("Ready"))
+        # ── Botón DESCARGAR GRANDE ────────────
+        self.btn_download = Button(
+            text="DESCARGAR",
+            size_hint=(1,.16),
+            font_size=26,
+            bold=True,
+            background_color=(0.1,0.65,0.3,1)
+        )
+        self.btn_download.bind(on_press=self.start_download)
+        self.add_widget(self.btn_download)
 
-    def update_status_if_idle(self, message):
-        # Helper to set status only if we aren't currently downloading
-        # simplified check: if status is green or orange (updates), we can reset. 
-        # But if downloading, status might be changing rapidly. 
-        # For now, just setting it is fine as downloads will overwrite it anyway.
-        if self.open_folder_btn.cget("state") == "disabled":
-             # downloading is active, don't overwrite
-             return
-        self.update_status(message, "gray")
+        # ── Progreso ──────────────────────────
+        self.progress = ProgressBar(max=100, value=0, size_hint=(1,.08))
+        self.add_widget(self.progress)
 
-    def open_download_folder(self):
-        output_path = cfg.RUTA_DESCARGAS
-        if os.path.exists(output_path):
-            os.startfile(output_path)
+        # ── Estado ────────────────────────────
+        self.status = Label(text="Esperando enlace...", size_hint=(1,.12))
+        self.add_widget(self.status)
 
-    def show_single_download(self):
-        self.single_view.pack(fill="both", expand=True)
+        # ── Firma ─────────────────────────────
+        self.signature = Label(
+            text="By Morris",
+            size_hint=(1,.07),
+            color=(1,0.3,0.3,1)
+        )
+        self.add_widget(self.signature)
 
-    def start_download_thread(self):
-        url = self.url_entry.get()
-        if not url:
-            self.status_label.configure(text="Please enter a URL", text_color="red")
+    # ── Funciones UI ────────────────────────
+    def paste_link(self, instance):
+        from kivy.core.clipboard import Clipboard
+        self.url_input.text = Clipboard.paste()
+
+    def clear_link(self, instance):
+        self.url_input.text = ""
+        self._set_status("Campo limpiado")
+
+    def select_mp4(self, instance):
+        self.format = "mp4"
+        self._animate_button(instance)
+        self._set_status("Formato MP4 seleccionado")
+
+    def select_mp3(self, instance):
+        self.format = "mp3"
+        self._animate_button(instance)
+        self._set_status("Formato Audio seleccionado")
+
+    def start_download(self, instance):
+        if self._downloading:
             return
-        
-        mode = self.type_var.get()
-        self.download_btn.configure(state="disabled")
-        self.open_folder_btn.configure(state="disabled", fg_color="gray")
-        self.progress_bar.set(0)
-        self.status_label.configure(text="Initializing...", text_color="white")
-        
-        thread = threading.Thread(target=self.download_task, args=(url, mode))
-        thread.start()
 
-    def download_task(self, url, mode):
+        url = self.url_input.text.strip()
+        if not url or not self.format:
+            self._set_status("Falta enlace o formato")
+            return
+
+        self._downloading = True
+        self.btn_download.disabled = True
+        self.progress.value = 0
+        self._set_status("Iniciando descarga...")
+
+        threading.Thread(
+            target=self._download_media,
+            args=(url,self.format),
+            daemon=True
+        ).start()
+
+    # ── MOTOR DE DESCARGA (NO TOCADO) ───────
+    def _download_media(self, url, format_type):
         try:
-            output_path = cfg.RUTA_DESCARGAS
-            if not os.path.exists(output_path):
-                os.makedirs(output_path)
-            
-            # Get ffmpeg binary path from imageio_ffmpeg
-            ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
-            
             ydl_opts = {
-                'ffmpeg_location': ffmpeg_path,
-                'outtmpl': os.path.join(output_path, '%(title)s.%(ext)s'),
-                'quiet': True,
-                'no_warnings': True,
-                'progress_hooks': [self.yt_dlp_progress_hook],
+                'outtmpl': os.path.join(BASE_DIR, '%(title)s.%(ext)s'),
+                'progress_hooks': [self._progress_hook],
+                'logger': YDL_Logger(),
+                'retries': 5
             }
 
-            if mode == "video":
-                # Best video + best audio
-                ydl_opts['format'] = 'bestvideo+bestaudio/best'
+            if format_type == "mp4":
+                ydl_opts['format'] = 'best'
             else:
-                # Audio only, convert to mp3
                 ydl_opts['format'] = 'bestaudio/best'
-                ydl_opts['postprocessors'] = [{
-                    'key': 'FFmpegExtractAudio',
-                    'preferredcodec': 'mp3',
-                    'preferredquality': '192',
-                }]
 
-            self.update_status(f"Downloading from {self.get_domain(url)}...", "white")
-            
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([url])
 
-            self.update_status("Download Complete!", "green")
-            self.open_folder_btn.configure(state="normal", fg_color=["#3B8ED0", "#1F6AA5"])
-
         except Exception as e:
-            self.update_status(f"Error: {str(e)}", "red")
-            print(f"Error details: {e}")
+            Clock.schedule_once(lambda dt: self._set_status(f"Error: {str(e)[:80]}"))
         finally:
-            self.download_btn.configure(state="normal")
-            self.progress_bar.stop()
+            Clock.schedule_once(lambda dt: self._unlock_ui())
 
-    def get_domain(self, url):
-        try:
-            from urllib.parse import urlparse
-            return urlparse(url).netloc
-        except:
-            return "URL"
-
-    def yt_dlp_progress_hook(self, d):
+    def _progress_hook(self, d):
         if d['status'] == 'downloading':
-            try:
-                p = d.get('_percent_str', '0%').replace('%','')
-                self.progress_bar.set(float(p) / 100)
-                self.update_status(f"Downloading... {d.get('_percent_str')} | ETA: {d.get('_eta_str')}", "white")
-            except:
-                pass
+            total = d.get('total_bytes') or d.get('total_bytes_estimate')
+            downloaded = d.get('downloaded_bytes',0)
+            if total:
+                pct = downloaded/total*100
+                Clock.schedule_once(lambda dt:self._update_progress(pct))
         elif d['status'] == 'finished':
-            self.update_status("Processing/Converting...", "orange")
+            Clock.schedule_once(lambda dt:self._finish_download())
 
-    def update_status(self, message, color):
-        self.status_label.configure(text=message, text_color=color)
+    def _update_progress(self,pct):
+        self.progress.value = pct
+        self._set_status(f"Descargando {int(pct)}%")
 
-if __name__ == "__main__":
-    app = App()
-    app.mainloop()
+    def _finish_download(self):
+        self.progress.value = 100
+        self._set_status("Descarga completada")
+
+    def _unlock_ui(self):
+        self._downloading=False
+        self.btn_download.disabled=False
+
+    def _set_status(self,text):
+        self.status.text=text
+
+    def _animate_button(self, btn):
+        anim = Animation(size_hint=(1.1,1.1), duration=0.1) + Animation(size_hint=(1,1), duration=0.1)
+        anim.start(btn)
+
+
+class DownloaderApp(App):
+    def build(self):
+        self.title="Descarga Tube PRO"
+        return DownloaderUI()
+
+
+if __name__=="__main__":
+    DownloaderApp().run()
