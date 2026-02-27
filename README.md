@@ -1,55 +1,122 @@
-# 📥 Universal Video Downloader "Never Die"
+📥 Descarga Tube PRO
 
-![Universal Downloader](https://img.shields.io/badge/Version-2.0-blue.svg) ![Python](https://img.shields.io/badge/Python-3.10+-yellow.svg) ![Status](https://img.shields.io/badge/Status-Active-green.svg)
+Descarga Tube PRO es una aplicación desarrollada con Python + Kivy + yt-dlp que permite descargar contenido multimedia desde:
 
-**Universal Video Downloader** es una herramienta potente y robusta diseñada para descargar videos y audio de miles de sitios web (YouTube, TikTok, Facebook, Instagram, Twitch, etc.) con una interfaz moderna y un sistema único de auto-reparación.
+✅ YouTube
 
-> **By Morris** 🔴
+✅ Facebook
 
-## ✨ Características Principales
+✅ TikTok
 
-*   **🚀 Sistema "Never Die" (Auto-Reparación)**:
-    *   El programa detecta automáticamente si el motor de descargas (`yt-dlp`) está obsoleto.
-    *   Descarga e instala parches automáticamente en segundo plano sin necesidad de volver a compilar el ejecutable.
-    *   ¡Nunca deja de funcionar aunque YouTube cambie sus algoritmos!
-*   **💻 Interfaz Moderna**: Construida con `CustomTkinter` para un modo oscuro elegante y profesional.
-*   **🌍 Multi-Plataforma**: Soporta miles de sitios web gracias al motor `yt-dlp`.
-*   **🎵 Video y Audio**: Elige entre descargar el video en máxima calidad o convertirlo y extraer solo el audio (MP3).
-*   **📦 Portable**: Funciona como un script de Python o como un ejecutable (.exe) independiente.
+✅ Instagram
 
-## 🛠️ Instalación y Uso
+La aplicación ofrece una interfaz gráfica sencilla y moderna para pegar enlaces, seleccionar formato y descargar archivos directamente en el dispositivo.
 
-### Opción 1: Usar el Ejecutable (Windows)
-1.  Descarga el archivo `UniversalDownloader.exe` de la carpeta `dist`.
-2.  Ejecútalo. ¡No requiere instalación!
-3.  El programa creará automáticamente las carpetas necesarias para guardar tus descargas.
+🚀 Funcionalidades
 
-### Opción 2: Ejecutar desde el código fuente
-1.  Clona este repositorio:
-    ```bash
-    git clone https://github.com/TU_USUARIO/TU_REPOSITORIO.git
-    cd Python_youtube_video_downloader-master
-    ```
-2.  Instala las dependencias:
-    ```bash
-    pip install -r requirements.txt
-    ```
-3.  Ejecuta la aplicación:
-    ```bash
-    python GuiPrincipal.py
-    ```
+📋 Botón para pegar enlaces desde el portapapeles.
 
-## 📸 Capturas
+🧹 Botón para limpiar el campo del enlace.
 
-*(Aquí puedes agregar capturas de pantalla de tu aplicación)*
+🎬 Descarga en formato MP4 (video).
 
-## 🔧 Requisitos (Para desarrolladores)
-*   Python 3.8+
-*   FFmpeg (necesario para la conversión de audio y unión de video/audio, incluido automáticamente vía `imageio-ffmpeg`).
+🎵 Descarga en formato Audio.
 
-## 📝 Créditos
+📊 Barra de progreso en tiempo real.
 
-Desarrollado con ❤️ **By Morris**.
+📱 Compatible con Android (APK) y escritorio (Linux / Windows).
 
----
-*Este proyecto es para fines educativos y de uso personal.*
+🎨 Interfaz moderna con iconos de plataformas.
+
+🛡️ Prevención de múltiples descargas simultáneas.
+
+📂 Archivos guardados automáticamente en una carpeta dedicada.
+
+📂 Ubicación de descargas
+
+Los archivos se guardan en:
+
+En Android:
+/storage/emulated/0/Download/DescargaTube
+En PC (Linux / Windows):
+~/Downloads/DescargaTube
+
+La carpeta se crea automáticamente si no existe.
+
+🛠️ Tecnologías utilizadas
+
+Python 3
+
+Kivy (interfaz gráfica)
+
+yt-dlp (motor de descarga)
+
+Buildozer (para generar APK en Android)
+
+📁 Estructura del proyecto
+DescargaTube/
+│
+├── main.py
+├── buildozer.spec
+├── youtube.png
+├── facebook.png
+├── tiktok.png
+├── instagram.png
+└── README.md
+▶️ Uso de la aplicación
+
+Abre la aplicación.
+
+Pega el enlace del video (YouTube, Facebook, TikTok o Instagram).
+
+Selecciona el formato:
+
+🎬 MP4 (Video)
+
+🎵 Audio
+
+Presiona el botón ⬇ DESCARGAR.
+
+Observa el progreso en pantalla.
+
+El archivo se guardará automáticamente en la carpeta DescargaTube.
+
+⚠️ Notas importantes
+
+La aplicación utiliza la librería yt-dlp para gestionar las descargas.
+
+No se modifica el motor interno de descarga al cambiar la interfaz gráfica.
+
+Es responsabilidad del usuario descargar únicamente contenido permitido por las políticas de cada plataforma.
+
+La aplicación no almacena información personal ni realiza seguimiento del usuario.
+
+📦 Compilación APK (Android)
+
+Requisitos:
+
+Linux
+
+Python 3
+
+Buildozer
+
+Android SDK / NDK
+
+Comando para compilar:
+
+buildozer android debug
+
+El APK se generará en la carpeta:
+
+bin/
+🧑‍💻 Autor
+
+Desarrollado por:
+Morris 😎
+Proyecto educativo y personal.
+
+📜 Licencia
+
+Este proyecto se distribuye con fines educativos.
+El uso de la aplicación debe respetar las políticas de uso de cada plataforma (YouTube, Facebook, TikTok, Instagram).
